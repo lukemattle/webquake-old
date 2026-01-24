@@ -759,8 +759,8 @@ def websocket_recv_open(ws: WebsocketBase):
 
 
 def send_notification(category_tag, title, message):
-    app_id = "9e4a84de-c3f9-4e84-b285-f1601c5e37de"
-    rest_api_key = "os_v2_app_tzfijxwd7fhijmuf6fqbyxrx32j4fmzmwgbeip5wbswtq57tzi4snplrul5eu6jpigodx7zheewfdfqdoqjg4uppnbg2bu634gwtxxq"
+    app_id = "<OneSignal App ID>"
+    rest_api_key = "<OneSignal API Key>"
 
     headers = {
         "Content-Type": "application/json; charset=utf-8",
