@@ -5,3 +5,5 @@ Japan has thousands of seismological observation stations embedded in land & sea
 
 For a deeper dive, you can read the document created for this project. While this document was created to be as informative as possible, it also had to be created to a specification, so some information may seem irrelevant. All details in the document were correct as of March 2025.
 As per the OCR guidance around AI usage, no LLMs were used to aid the development of code or documentation for this project.
+
+][poiytewq  
