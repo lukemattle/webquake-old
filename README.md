@@ -7,7 +7,7 @@ For a deeper dive, you can read the [document](https://github.com/lukemattle/web
 
 Project DM-DSS was used to source live data for this project. Access to this data requires a paid subscription, which is why this project doesn't have a live example. You can view screenshots of the webapp in the [document](https://github.com/lukemattle/webquake/blob/main/WebQuake.pdf).
 
-Current limitations:
+## Current limitations:
 - Cancelled warnings are not handled.
 - Multiple simultaneous warnings (of the same type) are not displayed concurrently. WebQuake will display the warning with the most recent update.
 - In tsunami & _**past**_ earthquake information, "very shallow" and "more than 700km" (for quake depth) are not translated into English.
