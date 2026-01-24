@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="WebQuake">
+    <link rel="apple-touch-icon" href="icons/webquake-192.png">
+    <link rel="icon" href="/icons/webquakefull-128.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <title>WebQuake</title>
+    <style>
+        body {
+            font-family: Roboto, sans-serif;
+            margin: 20px;
+        }
+        #connection-status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: #ccc;
+            color: #000;
+        }
+        .data-container {
+            margin-top: 20px;
+        }
+        .data-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .footer {
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            background-color: #f0f0f0; 
+            padding: 10px 10px 0px 10px; 
+            border-top: 1px solid #ddd; 
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .tab-content {
+            display: none;
+            margin-top: 10px;
+        }
+        .language-toggle {
+            margin-bottom: 20px;
+        }
+        .tab-title {
+            text-align: center;
+            background-color: #f0f0f0;
+            padding: 6px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 100%;
+            border-bottom: 1px solid #ddd;
+            display: block;
+        }
+        .tab-button.ja[lang="ja"],
+        .tab-title.ja[lang="ja"],
+        .time.ja[lang="ja"]
+        .data-item.ja[lang="ja"] {
+            display: none;
+        }
+        .intensity-1 { background-color: #e9e7f2; }
+        .intensity-w2 { background-color: #319ee5; color: white; }
+        .intensity-w3 { background-color: #355fa2; color: white; }
+        .intensity-4 { background-color: #eed895; }
+        .intensity-5-minus { background-color: #f1d946; }
+        .intensity-5-plus { background-color: #f58f38; }
+        .intensity-w6-minus { background-color: #fc3d28; color: white; }
+        .intensity-w6-plus { background-color: #953034; color: white; }
+        .intensity-w7 { background-color: #a92f6f; color: white; }
+        .advisory { background-color: #faf500; }
+        .warning { background-color: #ff2800; color: white; }
+        .major-warning { background-color: #c800ff; color: white; }
+        .lpgm-w1 { background-color: #0041ff; color: white; }
+        .lpgm-2 { background-color: #ffe600; }
+        .lpgm-w3 { background-color: #ff2800; color: white; }
+        .lpgm-w4 { background-color: #a50021; color: white; }
+    </style>
+
+<script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+<script>
+    if ('serviceWorker' in navigator) { // Register service worker
+      navigator.serviceWorker.register('service-worker.js')
+        .then(function(registration) {
+          console.log('Service Worker registered with scope:', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('Service Worker registration failed:', error);
+        });
+    }
+
+    function addTag(tagKey) { // Add tag to user
+        OneSignal.sendTag(tagKey, "subscribed")
+            .then(function() {
+                console.log(`Tag '${tagKey}' added successfully!`);// Log success message
+                if (currentLanguage === 'ja') { // Display translated alert if needed
+                    alert(`緊急地震速報、地震動予測、津波警報の通知への登録が完了しました。`);
+                } else {
+                    alert(`You are now subscribed to EEW, Forecasts & Tsunami Warning notifications.`);
+                }
+            })
+            .catch(function(error) { // Log error if tag addition fails
+                console.error(`Failed to add tag '${tagKey}':`, error);
+                if (currentLanguage === 'ja') {
+                    alert(`サブスクライブに失敗した`);
+                } else {
+                    alert(`Failed to subscribe.`);
+                }
+            });
+    }
+
+    function removeTag(tagKey) { 
+        OneSignal.deleteTag(tagKey) // Remove tag from user
+            .then(function() {
+                console.log(`Tag '${tagKey}' removed successfully!`); // Log success message
+                if (currentLanguage === 'ja') { // Display translated alert with the appropriate tag if needed
+                    alert(`これで通知の配信が停止されました。`);
+                } else {
+                    alert(`You are now unsubscribed from notifications.`); // Add tag to message
+                }
+            })
+            .catch(function(error) { // Log and alert user to error if tag removal fails
+                console.error(`Failed to remove tag '${tagKey}':`, error);
+                if (currentLanguage === 'ja') {
+                    alert(`登録解除に失敗しました。`);
+                } else {
+                    alert(`Failed to unsubscribe.`);
+                }
+            });
+    }
+
+    function enableNotifications() { // Enable notifications for user
+        OneSignal.push(function () {
+            OneSignal.isPushNotificationsEnabled().then(function (isEnabled) { // Check if notifications are already enabled
+                if (isEnabled) {
+                    if (currentLanguage === 'ja') {
+                        alert("あなたはすでに通知を購読しています。");
+                    } else {
+                        alert("You are already subscribed to notifications.");
+                    }
+                } else {
+                    OneSignal.registerForPushNotifications() // Register for notifications if not already enabled
+                        .then(function () {
+                            console.log("User subscribed to notifications.");
+                            if (currentLanguage === 'ja') {
+                                alert("通知が有効になりました！");
+                            } else {
+                                alert("Notifications have been enabled!");
+                            }
+                        })
+                        .catch(function (error) {
+                            console.error("Error subscribing to notifications:", error);
+                            if (currentLanguage === 'ja') {
+                                alert("通知を有効にできませんでした。ブラウザの設定を確認してください。");
+                            } else { // If subscription fails, prompt user to check browser settings (common issue)
+                                alert("Failed to enable notifications. Please check your browser settings.");
+                            }
+                        });
+                }
+            });
+        });
+    }
+
+    function unsubscribeFromNotifications() { // Called when user clicks button and is subscribed
+        OneSignal.push(function () { // Check if user is already subscribed to notifications
+            OneSignal.setSubscription(false)
+                .then(function () { // Unsubscribe user if already subscribed
+                    console.log("User successfully unsubscribed from notifications.");
+                    if (currentLanguage === 'ja') { // If language is Japanese, display translated alert
+                        alert("通知の購読を解除しました。");
+                    } else { // If language is English, display default alert
+                        alert("You have been unsubscribed from notifications.");
+                    }
+                })
+                .catch(function (error) { // Log error if unsubscribing fails
+                    console.error("Error unsubscribing from notifications:", error);
+                    if (currentLanguage === 'ja') {
+                        alert("通知の購読解除に失敗しました。もう一度お試しください。");
+                    } else {
+                        alert("Failed to unsubscribe from notifications. Please try again.");
+                    }
+                });
+        });
+    }
+
+
+    function toggleNotifications() { // If notifs are enabled, unsubscribe; if not, subscribe
+        OneSignal.push(function () {
+            OneSignal.isPushNotificationsEnabled().then(isEnabled => {
+                if (isEnabled) {
+                    unsubscribeFromNotifications();
+                } else {
+                    enableNotifications();
+                }
+            });
+        });
+    }
+
+    function toggleTag(tagKey) { // If tag is already added, remove; if not, add
+        let adjustedTag = tagKey; // Add the tag corresponding to their selected language
+        if (currentLanguage === 'ja') {
+            adjustedTag = tagKey + '_ja';
+        }
+
+        OneSignal.push(function () { 
+            OneSignal.getTags().then(tags => {
+                if (tags[adjustedTag] === "subscribed") {
+                    removeTag(adjustedTag); // If user is subbed, remove tag
+                } else {
+                    addTag(adjustedTag); // If user is not subbed, add tag
+                }
+            });
+        });
+    }
+
+    window.onload = function() { // Initialize OneSignal when page loads fully
+        if (typeof OneSignal !== 'undefined') {
+            OneSignal.push(function() {
+                OneSignal.init({
+                    appId: "<OneSignal App ID here>",
+                    autoRegister: false, // Prevent automatic registration
+                    promptOptions: {
+                        autoPrompt: false, // Disable automatic permission prompts
+                    },
+                    notifyButton: {
+                        enable: false, // Disable built-in notify button
+                    },
+                });
+
+                console.log("OneSignal initialized!");
+            });
+        }
+    };
+</script>     
+</head>
+
+<body>
+    <h1>
+        <img src="/icons/webquake-128.png" alt="WebQuake Logo" style="height: 1em; vertical-align: middle;">
+        WebQuake
+    </h1>
+    <div class="language-toggle" style="position: absolute; top: 20px; right: 20px;"> <!-- Language toggle buttons -->
+        <button onclick="setLanguage('en')">English</button>
+        <button onclick="setLanguage('ja')" lang="ja">日本語</button>
+    </div>
+    <div class="tabs" style="justify-content: center;"> <!-- Different tab buttons for English and Japanese -->
+        <button onclick="showTab('earthquake-tab')" class="tab-button en">Live Earthquake Warnings</button>
+        <button onclick="showTab('tsunami-tab')" class="tab-button en">Live Tsunami Warnings</button>
+        <button onclick="showTab('past-tab')" class="tab-button en">Past Earthquake Data</button>
+        <button onclick="showTab('earthquake-tab')" class="tab-button ja">ライブ地震警報</button>
+        <button onclick="showTab('tsunami-tab')" class="tab-button ja">ライブ津波警報</button>
+        <button onclick="showTab('past-tab')" class="tab-button ja">過去の地震データ</button>
+    </div>
+
+
+    <div id="earthquake-tab" class="tab-content">
+        <h2 class="tab-title en">Live Earthquake Warnings</h2> <!-- Tab titles in English and Japanese -->
+        <h2 class="tab-title ja">リアルタイム地震警報</h2>
+        <div id="earthquake-data" style="min-height:100vh">
+            <div class="data-item en" title="Earthquake Early Warning">EEW issued: </div> <!-- Data items in English and Japanese -->
+            <div class="data-item ja">緊急地震速報の発表: </div>
+            <div class="data-item en">Report Number: </div>
+            <div class="data-item ja">レポート番号: </div>
+            <div class="data-item en">Epicentre Location: </div>
+            <div class="data-item ja">震源地: </div>
+            <div class="data-item en" title="DD/MM/YYYY, HH/MM/SS">Quake Time: </div>
+            <div class="data-item ja">地震発生時刻: </div>
+            <div class="data-item en">Max Intensity: </div>
+            <div class="data-item ja">最大震度: </div>
+            <div class="data-item en" title="Long Period Ground Motion">Max LPGM: </div>
+            <div class="data-item ja">最大長周期地震動階級: </div>
+            <div class="data-item en">Magnitude: </div>
+            <div class="data-item ja">マグニチュード: </div>
+            <div class="data-item en">Depth: </div>
+            <div class="data-item ja">深さ: </div>
+            <div class="data-item en">Prefectures under warning: </div>
+            <div class="data-item ja">警報中の都道府県: </div>
+            <div class="data-item en">Final Report: </div>
+            <div class="data-item ja">最終報告: </div>
+            <div class="data-item en">Epicentre under sea: </div>
+            <div class="data-item ja">海底震源: </div>
+            <div class="data-item en" title="Please note that this is only a prediction. Always refer to official sources.">Tsunami Possible: </div> <!-- Remind users to refer to official sources for life saving information -->
+            <div class="data-item ja" title="これは予測であり、常に公式ソースを参照すること。">津波の可能性: </div>
+        </div>
+    </div>
+
+    <div id="tsunami-tab" class="tab-content" style="min-height:100vh">
+        <h2 class="tab-title en">Live Tsunami Warnings</h2>
+        <h2 class="tab-title ja">リアルタイム津波警報</h2>
+        <div id="tsunami-data">
+            <div class="data-item en" title="DD/MM/YYYY, HH/MM/SS">Quake Time: </div>
+            <div class="data-item ja">地震発生時刻: </div>
+            <div class="data-item en">Estimated Wave Heights: </div>
+            <div class="data-item ja">推定波高: </div>
+            <div class="data-item en">Estimated Arrival Times: </div>
+            <div class="data-item ja">到着予定時刻: </div>
+            <div class="data-item en">Observed Wave Heights: </div>
+            <div class="data-item ja">観測波高: </div>
+            <div class="data-item en">Warning Level: </div>
+            <div class="data-item ja">警告レベル: </div>
+        </div>
+    </div>
+
+    <div id="past-tab" class="tab-content" style="min-height:100vh">
+        <h2 class="tab-title en">Past Earthquake Data</h2>
+        <h2 class="tab-title ja">過去の地震情報</h2>
+        <div id="past-data">
+            <div class="data-item en">Epicentre Location: </div>
+            <div class="data-item ja">震源地: </div>
+            <div class="data-item en" title="DD/MM/YYYY, HH/MM/SS">Quake Time: </div>
+            <div class="data-item ja">地震発生時刻: </div>
+            <div class="data-item en">Max Intensity: </div>
+            <div class="data-item ja">最大震度: </div>
+            <div class="data-item en" title="Long Period Ground Motion">Max LPGM: </div>
+            <div class="data-item ja">最大長周期地震動階級: </div>
+            <div class="data-item en">Magnitude: </div>
+            <div class="data-item ja">マグニチュード: </div>
+            <div class="data-item en">Depth: </div>
+            <div class="data-item ja">深さ: </div>
+            <div class="data-item en">Prefectures: </div>
+            <div class="data-item ja">警報中の都道府県: </div>
+            <div class="data-item en">No Tsunami: </div>
+            <div class="data-item ja">津波なし: </div>
+        </div>
+        </div><br>
+
+        <div class="footer" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+            <div id="data-container" style="margin-bottom: 5px; white-space: nowrap;"></div>
+            <div style="display: flex; gap: 10px; margin-bottom: 5px; margin-right:15px;">
+                <button id="notificationsBtn" onclick="toggleNotifications()">
+                    <span class="notif en">Toggle Notifications</span>
+                    <span class="notif ja">通知を切り替える</span>
+                </button>
+                <button id="earthquakeBtn" onclick="toggleTag('warnings')">
+                    <span class="notif en">Toggle EEW, Forecast & Tsunami Subscription</span>
+                    <span class="notif ja">緊急地震速報、地震動予測、津波警報の購読を切り替える</span>
+                </button>
+            </div>
+            <div id="connection-status" style="width:100%; text-align:center;">Checking connection...</div>
+        </div>
+
+        <script>
+
+        
+        let currentLanguage = 'en'; // Default language is English
+        setLanguage(currentLanguage); // Set language on page load
+        const dataKeyMapping = { // Mapping of data keys to display labels in English and Japanese
+            epi_location_en: 'Epicentre Location',
+            epi_location_jp: '震源地',
+            report_time_en: 'Report Time',
+            report_time_jp: '報告時間',
+            report_num_en: 'Report Number',
+            report_num_jp: 'レポート番号',
+            max_int_en: 'Max Intensity',
+            max_int_jp: '最大震度',
+            max_lpgm_en: 'Max LPGM',
+            max_lpgm_jp: '最大長周期地震動階級',
+            magnitude_en: 'Magnitude',
+            magnitude_jp: 'マグニチュード',
+            depth_en: 'Depth',
+            depth_jp: '深さ',
+            prefectures_en: 'Prefectures under warning',
+            prefectures_jp: '警報中の都道府県',
+            regions_en: 'Regions',
+            regions_jp: '警告が出される地域',
+            arrival_times_en: 'Estimated Arrival Times',
+            arrival_times_jp: '到着予定時刻',
+            no_tsunami_en: 'No Tsunami',
+            no_tsunami_jp: '津波なし',
+            last_report_en: 'Final Report',
+            last_report_jp: '最終報告',
+            sea_en: 'Epicentre under sea',
+            sea_jp: '海底震源',
+            warning_en: 'EEW issued',
+            warning_jp: '緊急地震速報の発表',
+            tsunami_possible_en: 'Tsunami Possible',
+            tsunami_possible_jp: '津波の可能性',
+            heights_en: 'Estimated Wave Heights',
+            heights_jp: '推定波高',
+            obs_regions_en: 'Observed Wave Heights',
+            obs_regions_jp: '観測波高',
+            obs_heights_en: 'Observed Heights',
+            obs_heights_jp: '観測波高',
+            warning_level_en: 'Warning Level',
+            warning_level_jp: '警告レベル'
+        };
+
+        let lastMessageTime = Date.now(); // Initialize last message time for connection monitoring
+        let connectionAttempts = 0;
+        let reconnectTimer = null;
+
+        function getTranslatedMessage(msg) { // Translate connection status messages to Japanese if needed
+            if (currentLanguage === 'ja') {
+            const reconnectMatch = msg.match(/Reconnecting\.\.\. \(attempt (\d+)\)/);
+            if (msg === 'Stable Connection') return '接続が安定している';
+            if (msg === 'Unstable Connection') return '接続が安定しない';
+            if (msg === 'Connected') return '接続済み';
+            if (msg === 'Connection lost, please refresh') return '接続が切断されました。ページを更新してください。';
+            if (msg === 'Connection lost') return '接続が切断された';
+            if (reconnectMatch) return `再接続... (試みその${reconnectMatch[1]})`;
+            }
+            return msg;
+        }
+
+        function updateConnectionStatus(text, bg) { // Update connection status message and background color
+            const statusBox = document.getElementById('connection-status');
+            statusBox.textContent = getTranslatedMessage(text);
+            statusBox.style.backgroundColor = bg;
+        }
+
+        function monitorConnection() { // Monitor connection status and update message accordingly
+            const diff = (Date.now() - lastMessageTime) / 1000;
+            if (diff <= 1.5) { // If messages received every 1.5s, connection is stable
+            updateConnectionStatus('Stable Connection', '#8f8');
+            } else if (diff <= 5) { // If messages received every 1.5-5s, connection is unstable
+            updateConnectionStatus('Unstable Connection', '#ff8');
+            }
+        }
+        setInterval(monitorConnection, 1000); // Check connection status every second
+
+        function showTab(tabId) { // Show selected tab and hide others
+            document.getElementById('earthquake-tab').style.display = 'none';
+            document.getElementById('tsunami-tab').style.display = 'none';
+            document.getElementById('past-tab').style.display = 'none';
+            document.getElementById(tabId).style.display = 'block';
+        }
+        showTab('earthquake-tab');
+
+        function createWebSocket() { // Create WebSocket connection to WebQuake server
+            connectionAttempts++;
+            const socket = new WebSocket('wss://<YOUR_DOMAIN>/ws');
+
+            socket.addEventListener('open', () => {
+            updateConnectionStatus('Connected', '#8f8'); // Update connection status when connected
+            connectionAttempts = 0;
+            });
+
+            socket.addEventListener('error', () => {
+            console.error('WebSocket error');
+            });
+
+            socket.addEventListener('close', () => {
+            if (connectionAttempts < 5) { // Attempt to reconnect if connection lost
+                updateConnectionStatus(`Reconnecting... (attempt ${connectionAttempts})`, '#ff8'); // Update connection status when reconnecting and show user reconnection attempts
+                reconnectTimer = setTimeout(createWebSocket, 5000); // Try to reconnect every 5s
+            } else {
+                updateConnectionStatus('Connection lost, please refresh', '#f88'); // If reconnect attempts fail, prompt user to refresh page
+            }
+            });
+
+            socket.addEventListener('message', (event) => {
+            lastMessageTime = Date.now();
+            if (event.data.trim() === '!pong') { // Ignore ping messages
+                return;
+            }
+            try {
+                const data = JSON.parse(event.data); // Parse JSON data received from server
+                const updatedData = { ...data };
+                for (const key in data) { // Update data keys with English and Japanese translations
+                if (
+                    data.hasOwnProperty(key) &&
+                    !key.endsWith('_en') &&
+                    !key.endsWith('_jp') &&
+                    key !== 'jst_time'
+                ) {
+                    updatedData[`${key}_en`] = data[key];
+                    if (typeof data[key] === 'boolean') {
+                    updatedData[`${key}_jp`] = data[key] ? 'はい' : 'いいえ'; // Translate boolean values to Japanese
+                    } else {
+                    updatedData[`${key}_jp`] = data[key];
+                    }
+                }
+                }
+                displayData(updatedData);
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+            }
+            });
+
+            // Timeout for 25s to declare lost if not connected
+            setTimeout(() => {
+            if (socket.readyState !== WebSocket.OPEN && connectionAttempts >= 5) {
+                updateConnectionStatus('Connection lost', '#f88');
+            }
+            }, 55000);
+
+            // Attempt to ping every 10s to keep connection alive
+            setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send('!ping');
+            }
+            }, 10000);
+
+            return socket;
+        }
+
+        let socket = createWebSocket();
+        let eqTimer = null;
+
+        function displayData(data) { // Display data received from server
+            if (data.type === 'earthquake' && data.last_report !== undefined) { // Display live earthquake warnings tab when data of that type is issued
+                showTab('earthquake-tab');
+                if (eqTimer) clearTimeout(eqTimer);
+                eqTimer = setTimeout(() => showTab('tsunami-tab'), 60000);
+                updateData('earthquake-data', data);
+            } else if (data.type === 'earthquake' && data.last_report === undefined) {
+                showTab('past-tab');
+                if (eqTimer) clearTimeout(eqTimer);
+                eqTimer = setTimeout(() => showTab('tsunami-tab'), 60000);
+                updateData('past-data', data);
+            } else if (data.type === 'tsunami') {
+                if (eqTimer) {
+                    clearTimeout(eqTimer);
+                    eqTimer = null; // Never auto switch away from tsunami tab unless new data recieved
+                }
+                showTab('tsunami-tab');
+                updateData('tsunami-data', data);
+            }
+            if (data.jst_time) { // Display current time in JST
+                document.getElementById('data-container').innerHTML = `
+                    <span class="time en">Time (JST): ${data.jst_time}</span>
+                    <span class="time ja">時: ${data.jst_time}</span>
+                `;
+            }
+            setLanguage(currentLanguage);
+        }
+
+        function updateData(containerId, data) { // Update data items with received data
+            const container = document.getElementById(containerId);
+            for (const key in data) {
+                if (data.hasOwnProperty(key)) {
+                    let displayLabel = dataKeyMapping[key];
+                    if (!displayLabel) continue;
+                    let items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes(`${displayLabel}:`)); // Filter items by display label
+                    if (items.length === 0) { // If data recieved doesn't have a localisation, duplicate item and add localisation
+                        const newItem = document.createElement('div');
+                        newItem.className = `data-item ${key.endsWith('_en') ? 'en' : 'ja'}`; 
+                        newItem.textContent = `${displayLabel}: ${data[key]}`;
+                        container.appendChild(newItem);
+                    } else {
+                        items.forEach(item => {
+                            item.textContent = `${displayLabel}: ${data[key]}`; // Update item text content with new data
+                        });
+                    }
+                    if (key === 'obs_regions_en' && data.obs_heights) { // Display observed wave heights with their corresponding region
+                        const regions = data.obs_regions_en.split(', ');
+                        const heights = data.obs_heights.split(', ');
+                        const matchedHeights = regions.map((region, index) => `${region}: ${heights[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('Observed Heights:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item en';
+                            newItem.textContent = `Observed Wave Heights: ${matchedHeights}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `Observed Wave Heights: ${matchedHeights}`;
+                            });
+                        }
+                    }
+                    if (key === 'obs_regions_jp' && data.obs_heights) {
+                        const regions = data.obs_regions_jp.split(', ');
+                        const heights = data.obs_heights.split(', ');
+                        const matchedHeights = regions.map((region, index) => `${region}: ${heights[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('観測波高:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item ja';
+                            newItem.textContent = `観測波高: ${matchedHeights}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `観測波高: ${matchedHeights}`;
+                            });
+                        }
+                    }
+                    if (key === 'regions_en' && data.heights_en) {
+                        const regions = data.regions_en.split(', ');
+                        const heights = data.heights_en.split(', ');
+                        const matchedHeights = regions.map((region, index) => `${region}: ${heights[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('Estimated Wave Heights:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item en';
+                            newItem.textContent = `Estimated Wave Heights: ${matchedHeights}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `Estimated Wave Heights: ${matchedHeights}`;
+                            });
+                        }
+                    }
+                    if (key === 'regions_jp' && data.heights_jp) {
+                        const regions = data.regions_jp.split(', ');
+                        const heights = data.heights_jp.split(', ');
+                        const matchedHeights = regions.map((region, index) => `${region}: ${heights[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('推定波高:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item ja';
+                            newItem.textContent = `推定波高: ${matchedHeights}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `推定波高: ${matchedHeights}`;
+                            });
+                        }
+                    }
+                    if (key === 'regions_en' && data.arrival_times_en) {
+                        const regions = data.regions_en.split(', ');
+                        const arrivalTimes = data.arrival_times_en.split(', ');
+                        const matchedArrivalTimes = regions.map((region, index) => `${region}: ${arrivalTimes[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('Estimated Arrival Times:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item en';
+                            newItem.textContent = `Estimated Arrival Times: ${matchedArrivalTimes}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `Estimated Arrival Times: ${matchedArrivalTimes}`;
+                            });
+                        }
+                    }
+                    if (key === 'regions_jp' && data.arrival_times_jp) {
+                        const regions = data.regions_jp.split(', ');
+                        const arrivalTimes = data.arrival_times_jp.split(', ');
+                        const matchedArrivalTimes = regions.map((region, index) => `${region}: ${arrivalTimes[index]}`).join(', ');
+                        const items = Array.from(container.getElementsByClassName('data-item')).filter(el => el.textContent.includes('到着予定時刻:'));
+                        if (items.length === 0) {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'data-item ja';
+                            newItem.textContent = `到着予定時刻: ${matchedArrivalTimes}`;
+                            container.appendChild(newItem);
+                        } else {
+                            items.forEach(item => {
+                                item.textContent = `到着予定時刻: ${matchedArrivalTimes}`;
+                            });
+                        }
+                    }
+                    if (key === 'max_int_en' || key === 'max_int_jp') { // Display intensity values with corresponding class to change background color of data item
+                        const intensityValue = data[key];
+                        let intensityClass = '';
+                        switch (String(intensityValue)) {
+                            case '1':
+                                intensityClass = 'intensity-1';
+                                break;
+                            case '2':
+                                intensityClass = 'intensity-w2';
+                                break;
+                            case '3':
+                                intensityClass = 'intensity-w3';
+                                break;
+                            case '4':
+                                intensityClass = 'intensity-4';
+                                break;
+                            case '5-':
+                                intensityClass = 'intensity-5-minus';
+                                break;
+                            case '5+':
+                                intensityClass = 'intensity-5-plus';
+                                break;
+                            case '6-':
+                                intensityClass = 'intensity-w6-minus';
+                                break;
+                            case '6+':
+                                intensityClass = 'intensity-w6-plus';
+                                break;
+                            case '7':
+                                intensityClass = 'intensity-w7';
+                                break;
+                            default:
+                                break;
+                        }
+                        items.forEach(item => {
+                            item.className = `${intensityClass} ${item.className}`; // Add intensity class to data item
+                        });
+                    }
+                    if (key === 'warning_level_en' || key === 'warning_level_jp') {
+                        const warningValue = data[key];
+                        let warningClass = '';
+                        switch (warningValue.toLowerCase()) {
+                            case 'advisory':
+                                warningClass = 'advisory';
+                                break;
+                            case 'warning':
+                                warningClass = 'warning';
+                                break;
+                            case 'major warning':
+                                warningClass = 'major-warning';
+                                break;
+                            default:
+                                break;
+                        }
+                        items.forEach(item => {
+                            item.className = `${warningClass} ${item.className}`;
+                        });
+                    }
+                    if (key === 'max_lpgm_en' || key === 'max_lpgm_jp') {
+                        const lpgmValue = data[key];
+                        let lpgmClass = '';
+                        switch (lpgmValue) {
+                            case 1:
+                                lpgmClass = 'lpgm-w1';
+                                break;
+                            case 2:
+                                lpgmClass = 'lpgm-2';
+                                break;
+                            case 3:
+                                lpgmClass = 'lpgm-w3';
+                                break;
+                            case 4:
+                                lpgmClass = 'lpgm-w4';
+                                break;
+                            default:
+                                break;
+                        }
+                        items.forEach(item => {
+                            item.className = item.className.replace(/\bintensity-\S+/g, '').trim();
+                            item.className = `${lpgmClass} ${item.className}`.trim();
+                        });
+                    }
+                }
+            }
+        }
+
+        function setLanguage(language) { // Set language for page content
+            const enItems = document.querySelectorAll('.data-item.en, .tab-button.en, .tab-title.en, .time.en, .notif.en'); // Select all items with English and Japanese classes
+            const jaItems = document.querySelectorAll('.data-item.ja, .tab-button.ja, .tab-title.ja, .time.ja, .notif.ja');
+            if (language === 'en') { // Block all Japanese items and display English items
+                enItems.forEach(item => item.style.display = 'block');
+                jaItems.forEach(item => item.style.display = 'none');
+            } else if (language === 'ja') { // Block all English items and display Japanese items
+                enItems.forEach(item => item.style.display = 'none');
+                jaItems.forEach(item => item.style.display = 'block');
+            }
+            currentLanguage = language;
+        }
+    </script>
+</body>
+</html>
