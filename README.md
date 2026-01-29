@@ -5,6 +5,8 @@ Japan has thousands of seismological observation stations embedded in land & sea
 
 For a deeper dive, you can read the [document](https://github.com/lukemattle/webquake/blob/main/WebQuake.pdf) created for this project. While this document was created to be as informative as possible, it also had to be created to a specification, so some information may seem irrelevant. All details in the document were correct as of March 2025.<br>As per the OCR guidance around AI usage, no LLMs were used to aid the development of code or documentation for this project.
 
+You can read about how to get started with WebQuake in the [wiki](https://github.com/lukemattle/webquake/wiki).
+
 Project DM-DSS was used to source live data for this project. Access to this data requires a paid subscription, which is why this project doesn't have a live example. You can view screenshots of the webapp in the [document](https://github.com/lukemattle/webquake/blob/main/WebQuake.pdf).
 
 ## Current limitations:
